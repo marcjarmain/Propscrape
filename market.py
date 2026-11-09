@@ -209,12 +209,12 @@ def main():
         folder=ROOT/"output"
         cmd=[sys.executable,str(ROOT/"propscrape.py"),"--output",str(folder),"--max-pages",str(args.max_pages)]
         if args.url:cmd+=["--url",args.url]
-        rc=subprocess.run(cmd,cwd=ROOT,check=False).returncode
         snap=folder/"comparison.json"
-        if snap.exists():
-            # Do not reimport an old output file from a failed attempt.
-            age=dt.datetime.now(dt.timezone.utc).timestamp()-snap.stat().st_mtime
-            if age<600:print("Imported run",import_snapshot(snap))
-            else: print("No fresh snapshot written; database unchanged",file=sys.stderr)
+        before=snap.stat().st_mtime_ns if snap.exists() else None
+        rc=subprocess.run(cmd,cwd=ROOT,check=False).returncode
+        if snap.exists() and (before is None or snap.stat().st_mtime_ns!=before):
+            print("Imported run",import_snapshot(snap))
+        else:
+            print("No new snapshot written; database unchanged",file=sys.stderr)
         sys.exit(rc)
 if __name__=="__main__": main()
