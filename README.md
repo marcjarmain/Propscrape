@@ -1,22 +1,58 @@
-# PropScrape
-
-A small desktop command-line collector for Property24 for-sale search cards. It saves a structured JSON file for an LLM and a CSV for Excel. Search results are asking prices, not sale prices or valuations. The default is the Southern Suburbs regional search, which includes many suburbs. Other regions can be searched by supplying their Property24 search URL.
-
-Property24's [terms](https://www.property24.com/terms-and-conditions) restrict automated copying. Obtain permission where needed. The collector checks robots.txt, identifies itself, slows requests, and stops on blocks; it does not bypass challenges. A desktop connection does not guarantee access. Do not upload listing data to a public repository. This repository itself is public.
+# PropScrape — weekly property market monitor
 
 ## Windows setup
 
-1. Install Python 3 from python.org, selecting **Add Python to PATH**. Download or clone this repository to your PC and open a terminal in its folder.
-2. Edit `subject.json` in Notepad. Save another subject file when comparing a different property.
-3. Run `py propscrape.py`.
-4. Open `output/comparison.json` in an LLM, or `output/listings.csv` in Excel. Ask it to compare the subject with listings of similar type, size and location and explain missing data.
+1. In GitHub Desktop select **Propscrape**, then **Fetch origin → Pull origin**.
+2. Click **Show in Explorer** and double-click **setup_weekly.bat** once.
+3. Double-click **open_dashboard.bat** to view your local report.
 
-For a different regional search, copy its full URL from your browser and run:
+Python 3 must already work. Setup imports your existing output/listings.csv if present, preserving observation dates and correcting numeric prices using original price text. The old CSV is a baseline with unverified coverage, not a complete market snapshot. Setup does not start a scrape.
+
+The Windows task **Propscrape Weekly** runs **Monday 09:00 in your PC's local time**. Keep the PC clock on South Africa time for 09:00 SAST. The PC must be on, online and you must be signed in. Windows is configured to catch up when available. The schedule is NOT active until setup succeeds on your PC. If Windows denies registration, inspect the error. Reinstall the task if you move the repository.
+
+Use **remove_weekly.bat** to remove the schedule; data is retained. **run.bat** starts a manual collection. **open_dashboard.bat** opens results without contacting Property24.
+
+## Useful outputs
+
+- Per-suburb, property-type and price-band listing counts and median asking prices.
+- Individual asking-price changes between complete snapshots.
+- First and last observed dates, observation count and days between first and last observation.
+- Advertised under-offer or sold/unavailable wording, when present in search-card text.
+- Listings missing since the previous complete snapshot, NOT assumed sold.
+- Historical weekly tables for inventory and median asking prices.
+
+The default covers the **Southern Suburbs regional search**, not all Cape Town. Counts are listing IDs, not unique houses or confirmed available stock. Multiple agents may list the same home. Advertised statuses are text matches needing verification; absent labels mean unknown. Days observed are a lower bound on history, not actual days on market; relisting under a new ID starts a new history. Missing listings may be withdrawn, relisted, outside the search or sold.
+
+The report is output/dashboard.html. Its search box filters tables by suburb, property type or price band. No server or extra Python packages are needed. output/market.json is suitable for an LLM. CSV reports: suburb_summary.csv, listings_history.csv, price_changes.csv, missing_listings.csv and weekly_trends.csv.
+
+Price bands: below R4m; R4m to below R6m; R6m–R8m; above R8m–R10m; above R10m; unknown. Median changes can reflect a changing mix of properties, not changes in the value of an individual home. These are asking prices, not achieved sales.
+
+## Data and collection quality
+
+History is saved in data/market.sqlite3. Every attempt is retained, including failed/partial runs. The dashboard uses the latest complete snapshot and separately shows the latest attempt. Partial runs do not create inventory or price-change trends. Before any complete run exists, the baseline is displayed with a partial-data warning. Large inventory declines are flagged for coverage review. A completed pagination pass does not prove every listing was supplied or that results stayed static during collection.
+
+Each distinct search URL has its own history. Search-card sizes remain unspecified when erf versus floor area is not clear. Listing detail pages are not fetched.
+
+Page HTML is cached in data/pages; logs are in data/logs. A one-generation database backup is made after collection. Back up the whole data folder independently. Old page caches can be deleted to reclaim space without deleting the database.
+
+## Request behaviour
+
+The collector uses **60 seconds between pages**, one at a time, up to 100 pages (about an hour for 58 pages). It stops on errors, restrictions, unrecognised cards and pagination loops. No automatic retries, proxy rotation or CAPTCHA bypass. A lock prevents overlapping runs; scheduled attempts are skipped when an attempt occurred within six days.
+
+This reduces load; it is not a verified safe rate or permission to scrape. Property24's [terms](https://www.property24.com/terms-and-conditions) restrict automated copying; obtain permission where needed. Robots rules are checked before collection.
+
+After a forced shutdown, confirm collection has stopped before deleting a stale data/run.lock. The repository is public; data/, output/ and database files are ignored by git. Keep local data private.
+
+## Commands
 
 ```
-py propscrape.py --url "https://www.property24.com/for-sale/alias/southern-suburbs/25/western-cape/9" --subject subject.json --output output
+py -3 market.py --report-only
+py -3 market.py --import-csv output/listings.csv
+py -3 market.py --max-pages 5 --delay 60
+py -3 -m unittest -v test_market.py
 ```
 
-Use `python3` instead of `py` on macOS/Linux. `--max-pages 10` limits pages; `--delay 2` controls seconds between requests. Runs overwrite output files, so use a different `--output` folder for each region or date. This first version searches one regional URL per run; it does not combine regions automatically.
+The five-page command is a real collection test and is treated as partial. The legacy propscrape.py exporter and editable subject.json remain available; use market.py or run.bat for persistent history. The history report does not make valuations against the subject.
 
-The JSON contains the subject, all extracted listings, source URLs, collection time and coverage/stop reason. Duplicates within a run are removed by listing ID. `Unclassified` suburbs remain in the results. Region labels are a starting list, not a complete authoritative geography. If a page has no recognisable cards, access is blocked, or a page limit is reached, the run stops and marks coverage incomplete. Search-card size is kept as `advertised_size_m2`, not assumed to be erf or floor area; specific erf and floor fields remain blank until confirmed. Room counts can be blank when not labelled in the page. Check output against the website. It has not been tested against a live Property24 page in the development environment.
+Parser and history/report checks use offline fixtures and the original CSV. Windows task installation and a fresh live collection still require verification on your PC.
+
