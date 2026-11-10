@@ -49,6 +49,12 @@ def number(s):
     try: return float(v) if '.' in v else int(v)
     except ValueError: return None
 
+def asking_price(text):
+    """Read only the currency amount, never the following bedroom count."""
+    if not text or re.search(r'\b(POA|auction)\b',text,re.I): return None
+    m=re.search(r'\bR\s*(\d{1,3}(?:[\s,\u00a0]\d{3})+|\d+)(?:\.\d{2})?',text)
+    return int(re.sub(r'[\s,]','',m.group(1))) if m else None
+
 def parse(html, page_url):
     p=Parser(); p.feed(html); out=[]
     tiles=[n for n in p.root.walk() if n.has('p24_regularTile') or n.has('p24_proTile')]
@@ -65,10 +71,10 @@ def parse(html, page_url):
             val=number(f.text())
             for k,patterns in {'bedrooms':['bedroom','bed '], 'bathrooms':['bathroom','bath '], 'parking':['parking','garage','car '], 'size_m2':['size','erf','floor','m²','m2']}.items():
                 if any(x in labels for x in patterns) and val is not None: feats.setdefault(k,val)
-        match=re.search(r'(house|apartment|flat|townhouse|vacant land|farm|commercial)', title, re.I)
+        match=re.search(r'\b(townhouse|house|apartment|flat|vacant land|farm|commercial)\b', title or price, re.I)
         rawsize=feats.pop('size_m2',None)
         url=urllib.parse.urljoin(BASE,href).split('?')[0]
-        out.append({'listing_id':url.rstrip('/').split('/')[-1], 'url':url,'source':'Property24','search_url':page_url,'observed_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'asking_price_zar':number(price) if re.search(r'\d',price) else None,'price_text':price,'title':title,'suburb':suburb,'region':region(suburb),'property_type':match.group(1).lower() if match else None,'bedrooms':feats.get('bedrooms'),'bathrooms':feats.get('bathrooms'),'parking':feats.get('parking'),'advertised_size_m2':rawsize,'size_type':'unspecified' if rawsize else None,'erf_m2':None,'floor_m2':None,'description':value('p24_excerpt')})
+        out.append({'listing_id':url.rstrip('/').split('/')[-1], 'url':url,'source':'Property24','search_url':page_url,'observed_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'asking_price_zar':asking_price(price),'price_text':price,'title':title,'suburb':suburb,'region':region(suburb),'property_type':match.group(1).lower() if match else None,'bedrooms':feats.get('bedrooms'),'bathrooms':feats.get('bathrooms'),'parking':feats.get('parking'),'advertised_size_m2':rawsize,'size_type':'unspecified' if rawsize else None,'erf_m2':None,'floor_m2':None,'description':value('p24_excerpt'),'status_text':t.text()})
     nexturl=None
     for n in p.root.walk():
         if n.tag=='a' and (n.text().strip().lower()=='next' or n.attrs.get('rel')=='next') and n.attrs.get('href'):
@@ -91,7 +97,11 @@ def run(args):
         if not robot.can_fetch(UA,url): reason='robots.txt disallows '+url; break
         seen.add(url)
         try: html=fetch(url)
-        except (urllib.error.URLError,RuntimeError) as e: reason='fetch failed: '+str(e); break
+        except (urllib.error.URLError,RuntimeError,TimeoutError,OSError) as e: reason='fetch failed: '+str(e); break
+        cache=getattr(args,'cache',None)
+        if cache:
+            Path(cache).mkdir(parents=True,exist_ok=True)
+            (Path(cache)/('page-%03d.html'%(len(pages)+1))).write_text(html,encoding='utf-8')
         rows,nxt=parse(html,url)
         if not rows: reason='no listing cards recognised; page may have changed or blocked access'; break
         for row in rows: listings[row['listing_id']]=row
@@ -99,12 +109,12 @@ def run(args):
         print(f'Page {len(pages)}: {len(rows)} cards; {len(listings)} unique',flush=True)
         url=nxt
         if url and len(pages)<args.max_pages: time.sleep(args.delay)
-    if url and len(pages)>=args.max_pages: reason='page limit reached; coverage incomplete'
+    if url and reason=='complete': reason='pagination loop or page limit; coverage incomplete'
     return list(listings.values()), {'pages':pages,'stop_reason':reason,'complete':reason=='complete','unique_listings':len(listings)}
 def main():
     ap=argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--url',default=START,help='Property24 for-sale region search URL')
-    ap.add_argument('--max-pages',type=int,default=100); ap.add_argument('--delay',type=float,default=2)
+    ap.add_argument('--max-pages',type=int,default=100); ap.add_argument('--delay',type=float,default=60)
     ap.add_argument('--subject',default='subject.json'); ap.add_argument('--output',default='output')
     a=ap.parse_args()
     if a.max_pages<1 or a.delay<0: ap.error('Invalid page limit or delay')
@@ -123,3 +133,4 @@ def main():
 if __name__=='__main__':
     try: sys.exit(main())
     except (OSError,ValueError,RuntimeError) as e: print('Error:',e,file=sys.stderr); sys.exit(1)
+
