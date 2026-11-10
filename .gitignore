@@ -1,2 +1,5 @@
 output/
+data/
+*.sqlite3
 __pycache__/
+
