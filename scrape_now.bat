@@ -1,9 +1,9 @@
 @echo off
 cd /d "%~dp0"
-where py >nul 2>&1
+where python >nul 2>&1
 if not errorlevel 1 (
-    py -3 market.py
-) else (
     python market.py
+) else (
+    py -3 market.py
 )
 pause

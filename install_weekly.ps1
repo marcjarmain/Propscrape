@@ -1,11 +1,16 @@
 $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
-$python = Get-Command py.exe -ErrorAction SilentlyContinue
-$prefix = '-3 '
-if (-not $python) { $python = Get-Command python.exe -ErrorAction SilentlyContinue; $prefix = '' }
-if (-not $python) { throw 'Install Python 3, then run setup_weekly.bat again.' }
-$probe = if ($prefix) { & $python.Source -3 -c 'import sys; print(sys.executable)' } else { & $python.Source -c 'import sys; print(sys.executable)' }
-if ($LASTEXITCODE -ne 0) { throw 'Python 3 is not working.' }
+$python = Get-Command python.exe -ErrorAction SilentlyContinue
+$probe = $null
+if ($python) {
+    $probe = & $python.Source -c 'import sys; assert sys.version_info.major == 3; print(sys.executable)'
+    if ($LASTEXITCODE -ne 0) { $probe = $null }
+}
+if (-not $probe) {
+    $python = Get-Command py.exe -ErrorAction SilentlyContinue
+    if ($python) { $probe = & $python.Source -3 -c 'import sys; print(sys.executable)' }
+    if (-not $python -or $LASTEXITCODE -ne 0) { throw 'Install Python 3, then run setup_weekly.bat again.' }
+}
 $exe = ($probe | Select-Object -Last 1).Trim()
 if (Test-Path 'output\listings.csv') {
     & $exe market.py --import-csv 'output\listings.csv'
