@@ -1,0 +1,37 @@
+{
+ "job": "propscrape",
+ "written": "2026-11-20T06:37:09.242495+00:00",
+ "expected_every_days": 7,
+ "last_job": {
+  "started": "2026-11-20T06:37:08.867485+00:00",
+  "finished": "2026-11-20T06:37:09.104163+00:00",
+  "state": "finished",
+  "exit_code": 0
+ },
+ "latest_run": {
+  "id": 2,
+  "started": "2026-11-19T12:46:33.949503+00:00",
+  "finished": "2026-11-19T13:50:30.071894+00:00",
+  "complete": 0,
+  "reason": "unexpected next-page domain",
+  "count": 1234
+ },
+ "recent_runs": [
+  {
+   "id": 2,
+   "started": "2026-11-19T12:46:33.949503+00:00",
+   "finished": "2026-11-19T13:50:30.071894+00:00",
+   "complete": 0,
+   "reason": "unexpected next-page domain",
+   "count": 1234
+  },
+  {
+   "id": 1,
+   "started": "2026-11-09T17:25:58.363942+00:00",
+   "finished": "2026-11-19T12:46:03.197758+00:00",
+   "complete": 0,
+   "reason": "CSV baseline: historical coverage unverified",
+   "count": 1220
+  }
+ ]
+}
