@@ -78,7 +78,11 @@ def parse(html, page_url):
     nexturl=None
     for n in p.root.walk():
         if n.tag=='a' and (n.text().strip().lower()=='next' or n.attrs.get('rel')=='next') and n.attrs.get('href'):
-            nexturl=urllib.parse.urljoin(page_url,n.attrs['href']); break
+            href = n.attrs['href'].strip()
+            if href.lower() == 'javascript:;' and n.has('text-muted'):
+                continue
+            nexturl = urllib.parse.urljoin(page_url, href)
+            break
     return out,nexturl
 
 def fetch(url):
